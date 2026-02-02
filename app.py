@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import math
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 st.set_page_config(page_title="ID3 Tree Visualizer")
 
@@ -31,7 +33,7 @@ def id3(df, target, attrs):
     return tree
 
 st.title("ID3 Decision Tree Classifier")
-st.info("This application implements the ID3 algorithm using Entropy and Information Gain. It constructs a decision tree to classify categorical data based on feature importance.")
+st.info("This app builds an ID3 tree and visualizes feature importance using Information Gain.")
 
 st.sidebar.header("Configuration")
 data_option = st.sidebar.selectbox("Dataset Source", ["Synthetic Tennis Data", "Upload CSV"])
@@ -49,35 +51,36 @@ else:
     if file:
         df = pd.read_csv(file)
     else:
-        st.warning("Please upload a CSV file.")
         st.stop()
 
 target_col = st.sidebar.selectbox("Select Target Label", df.columns, index=len(df.columns)-1)
 features = [c for c in df.columns if c != target_col]
 
-st.subheader("Data Preview")
-st.dataframe(df.head(), use_container_width=True)
-
-if st.button("Generate Decision Tree"):
+if st.button("Generate Tree & Analyze Features"):
+    # 1. Generate Tree
     tree = id3(df, target_col, features)
     
-    st.subheader("Tree Visualization (JSON Structure)")
+    # 2. Calculate Information Gain for Visualization
+    gains = {feat: info_gain(df, feat, target_col) for feat in features}
+    gain_df = pd.DataFrame(list(gains.items()), columns=['Feature', 'Information Gain']).sort_values(by='Information Gain', ascending=False)
+
+    # 3. Visualization Section
+    st.subheader("Feature Importance (Information Gain)")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    sns.barplot(x='Information Gain', y='Feature', data=gain_df, palette='viridis', ax=ax)
+    ax.set_title("How the ID3 Algorithm Prioritized Features")
+    st.pyplot(fig)
+
+    st.subheader("Decision Logic (JSON)")
     st.json(tree)
-    
-    st.subheader("Logic Flow")
-    def display_tree(tree, indent=""):
-        if not isinstance(tree, dict):
-            st.text(f"{indent}Result: {tree}")
-            return
-        for node, branches in tree.items():
-            st.text(f"{indent}[{node}]")
-            for value, branch in branches.items():
-                st.text(f"{indent}  --> {value}")
-                display_tree(branch, indent + "      ")
-    
-    display_tree(tree)
+
+    # 4. Target Distribution Plot
+    st.subheader("Target Variable Distribution")
+    fig2, ax2 = plt.subplots()
+    df[target_col].value_counts().plot(kind='pie', autopct='%1.1f%%', ax=ax2, colors=['#ff9999','#66b3ff'])
+    ax2.set_ylabel('')
+    st.pyplot(fig2)
 
 st.sidebar.divider()
-st.sidebar.write("Step 1: Select Data")
-st.sidebar.write("Step 2: Define Target")
-st.sidebar.write("Step 3: Build & Visualize")
+st.sidebar.write("Algorithm: ID3")
+st.sidebar.write("Metric: Information Gain")
